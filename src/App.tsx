@@ -6,11 +6,17 @@ import './index.css';
 import defaultBanner from './assets/banner.png';
 import defaultAvatar from './assets/avatar.png';
 
-// Configure localforage for lifetime storage
+// Configure localforage for lifetime storage (legacy profile settings)
 localforage.config({
   name: 'TradingGrowthApp',
   storeName: 'profiles'
 });
+
+type GithubImage = {
+  url: string;
+  sha: string;
+  path: string;
+};
 
 const compressImage = (file: File): Promise<string> => {
   return new Promise((resolve) => {
@@ -56,13 +62,14 @@ function App() {
   
   // Tabs and content state
   const [activeTab, setActiveTab] = useState<'profits' | 'payouts'>('profits');
-  const [profits, setProfits] = useState<string[]>([]);
-  const [payouts, setPayouts] = useState<string[]>([]);
+  const [profits, setProfits] = useState<GithubImage[]>([]);
+  const [payouts, setPayouts] = useState<GithubImage[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Modal states
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [modalAction, setModalAction] = useState<'upload' | 'delete'>('upload');
-  const [deleteTarget, setDeleteTarget] = useState<{tab: 'profits'|'payouts', index: number} | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{tab: 'profits'|'payouts', post: GithubImage} | null>(null);
   
   // Lightbox state
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -83,44 +90,79 @@ function App() {
     if (savedCover) setCoverPhoto(savedCover);
     if (savedAvatar) setAvatarPhoto(savedAvatar);
     
-    // Load large arrays from IndexedDB (localforage)
-    localforage.getItem<string[]>('profile-profits-v3').then(savedProfits => {
-      if (savedProfits) setProfits(savedProfits);
-    });
+    // Fetch images from GitHub API (Vercel Serverless Function)
+    const fetchImages = async () => {
+      try {
+        const resProfits = await fetch('/api/list?folder=profits');
+        if (resProfits.ok) {
+          setProfits(await resProfits.json());
+        }
+        
+        const resPayouts = await fetch('/api/list?folder=payouts');
+        if (resPayouts.ok) {
+          setPayouts(await resPayouts.json());
+        }
+      } catch (err) {
+        console.error('Error fetching images:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
     
-    localforage.getItem<string[]>('profile-payouts-v3').then(savedPayouts => {
-      if (savedPayouts) setPayouts(savedPayouts);
-    });
+    fetchImages();
   }, []);
-
-  // Save posts to IndexedDB when they change
-  useEffect(() => {
-    localforage.setItem('profile-profits-v3', profits);
-  }, [profits]);
-
-  useEffect(() => {
-    localforage.setItem('profile-payouts-v3', payouts);
-  }, [payouts]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    
+    // We already authenticated to get here, but the actual upload happens inside handlePasswordSubmit
+    // Wait, the flow is: click -> password -> file input opens -> handleImageUpload runs
+    // Actually, we need the password inside handleImageUpload!
+    
+    // So we can prompt for password *first*, store it, then use it here.
+    // However, the password modal handles the actual file input click.
+  };
 
-    // Process all images concurrently and compress them
-    const compressedImages = await Promise.all(
-      Array.from(files).map(file => compressImage(file))
-    );
-    
-    // Update state only once with all images to prevent React from crashing
-    if (activeTab === 'profits') {
-      setProfits(prev => [...compressedImages, ...prev]);
-    } else {
-      setPayouts(prev => [...compressedImages, ...prev]);
-    }
-    
-    // Reset input
-    if (postInputRef.current) {
-      postInputRef.current.value = '';
+  const processUploads = async (files: FileList) => {
+    try {
+      const compressedImages = await Promise.all(
+        Array.from(files).map(file => compressImage(file))
+      );
+      
+      for (const base64 of compressedImages) {
+        const timestamp = new Date().getTime();
+        const filename = `${timestamp}-${Math.floor(Math.random() * 1000)}.jpg`;
+        
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: base64,
+            filename: filename,
+            folder: activeTab,
+            password: passwordInput
+          })
+        });
+        
+        if (!response.ok) throw new Error('Upload failed');
+        const data = await response.json();
+        
+        const newImage: GithubImage = {
+          url: data.data.content.download_url,
+          sha: data.data.content.sha,
+          path: data.data.content.path
+        };
+        
+        if (activeTab === 'profits') {
+          setProfits(prev => [newImage, ...prev]);
+        } else {
+          setPayouts(prev => [newImage, ...prev]);
+        }
+      }
+    } catch (err) {
+      alert('Error uploading to GitHub. Ensure the backend token is set up.');
+      console.error(err);
     }
   };
 
@@ -129,28 +171,45 @@ function App() {
     setShowPasswordModal(true);
   };
 
-  const triggerDelete = (tab: 'profits' | 'payouts', index: number) => {
-    setDeleteTarget({ tab, index });
+  const triggerDelete = (tab: 'profits' | 'payouts', post: GithubImage) => {
+    setDeleteTarget({ tab, post });
     setModalAction('delete');
     setShowPasswordModal(true);
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (passwordInput === 'as1as2as3as4as5') {
       setShowPasswordModal(false);
-      setPasswordInput('');
       setPasswordError('');
       
       if (modalAction === 'upload') {
         postInputRef.current?.click();
       } else if (modalAction === 'delete' && deleteTarget) {
-        if (deleteTarget.tab === 'profits') {
-          setProfits(prev => prev.filter((_, i) => i !== deleteTarget.index));
-        } else {
-          setPayouts(prev => prev.filter((_, i) => i !== deleteTarget.index));
+        try {
+          const response = await fetch('/api/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              path: deleteTarget.post.path,
+              sha: deleteTarget.post.sha,
+              password: passwordInput
+            })
+          });
+          
+          if (!response.ok) throw new Error('Failed to delete');
+          
+          if (deleteTarget.tab === 'profits') {
+            setProfits(prev => prev.filter(p => p.sha !== deleteTarget.post.sha));
+          } else {
+            setPayouts(prev => prev.filter(p => p.sha !== deleteTarget.post.sha));
+          }
+        } catch (err) {
+          alert('Error deleting from GitHub.');
+          console.error(err);
         }
         setDeleteTarget(null);
+        setPasswordInput('');
       }
     } else {
       setPasswordError('Incorrect password. Please try again.');
@@ -235,11 +294,19 @@ function App() {
             multiple
             className="hidden-file-input" 
             ref={postInputRef}
-            onChange={handleImageUpload}
+            onChange={(e) => {
+              if (e.target.files && e.target.files.length > 0) {
+                processUploads(e.target.files);
+              }
+            }}
           />
         </div>
 
-        {currentPosts.length === 0 ? (
+        {isLoading ? (
+          <div className="empty-state" style={{flex: 1}}>
+            Loading images from GitHub...
+          </div>
+        ) : currentPosts.length === 0 ? (
           <div className="empty-state" style={{flex: 1}}>
             No images yet.
           </div>
@@ -249,16 +316,16 @@ function App() {
             className="my-masonry-grid"
             columnClassName="my-masonry-grid_column"
           >
-            {currentPosts.map((post, index) => (
+            {currentPosts.map((post) => (
               <div 
-                key={index} 
+                key={post.sha} 
                 className="post-card" 
-                onClick={() => setSelectedImage(post)}
+                onClick={() => setSelectedImage(post.url)}
                 onContextMenu={preventCopy}
               >
                 <img 
-                  src={post} 
-                  alt={`${activeTab} ${index}`} 
+                  src={post.url} 
+                  alt={`${activeTab}`} 
                   className="post-image protected-img" 
                   onContextMenu={preventCopy}
                   onDragStart={preventCopy}
@@ -267,7 +334,7 @@ function App() {
                   className="delete-btn" 
                   onClick={(e) => {
                     e.stopPropagation();
-                    triggerDelete(activeTab, index);
+                    triggerDelete(activeTab, post);
                   }}
                   title="Delete image"
                 >
