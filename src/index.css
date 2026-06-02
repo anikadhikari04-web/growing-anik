@@ -202,13 +202,11 @@ input {
 
 .posts-grid {
   flex: 1;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 24px;
+  columns: 250px;
+  column-gap: 24px;
 }
 
 .post-card {
-  aspect-ratio: 1;
   position: relative;
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -216,6 +214,10 @@ input {
   transition: var(--transition-normal);
   background: var(--bg-secondary);
   cursor: pointer;
+  break-inside: avoid;
+  margin-bottom: 24px;
+  display: inline-block;
+  width: 100%;
 }
 
 .post-card:hover {
@@ -225,8 +227,8 @@ input {
 
 .post-image {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  display: block;
   transition: var(--transition-normal);
 }
 
