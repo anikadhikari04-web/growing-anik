@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, TrendingUp, Trash2, X } from 'lucide-react';
+import Masonry from 'react-masonry-css';
 import localforage from 'localforage';
 import './index.css';
 import defaultBanner from './assets/banner.png';
@@ -162,6 +163,13 @@ function App() {
     e.preventDefault();
   };
 
+  const breakpointColumnsObj = {
+    default: 4,
+    1100: 3,
+    700: 2,
+    500: 1
+  };
+
   return (
     <div className="container" onContextMenu={preventCopy}>
       {/* Cover Photo */}
@@ -231,39 +239,44 @@ function App() {
           />
         </div>
 
-        <div className="posts-grid">
-          {currentPosts.map((post, index) => (
-            <div 
-              key={index} 
-              className="post-card" 
-              onClick={() => setSelectedImage(post)}
-              onContextMenu={preventCopy}
-            >
-              <img 
-                src={post} 
-                alt={`${activeTab} ${index}`} 
-                className="post-image protected-img" 
+        {currentPosts.length === 0 ? (
+          <div className="empty-state" style={{flex: 1}}>
+            No images yet.
+          </div>
+        ) : (
+          <Masonry
+            breakpointCols={breakpointColumnsObj}
+            className="my-masonry-grid"
+            columnClassName="my-masonry-grid_column"
+          >
+            {currentPosts.map((post, index) => (
+              <div 
+                key={index} 
+                className="post-card" 
+                onClick={() => setSelectedImage(post)}
                 onContextMenu={preventCopy}
-                onDragStart={preventCopy}
-              />
-              <button 
-                className="delete-btn" 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  triggerDelete(activeTab, index);
-                }}
-                title="Delete image"
               >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          ))}
-          {currentPosts.length === 0 && (
-            <div className="empty-state">
-              No images yet.
-            </div>
-          )}
-        </div>
+                <img 
+                  src={post} 
+                  alt={`${activeTab} ${index}`} 
+                  className="post-image protected-img" 
+                  onContextMenu={preventCopy}
+                  onDragStart={preventCopy}
+                />
+                <button 
+                  className="delete-btn" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    triggerDelete(activeTab, index);
+                  }}
+                  title="Delete image"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+          </Masonry>
+        )}
       </div>
 
       {/* Password Modal */}

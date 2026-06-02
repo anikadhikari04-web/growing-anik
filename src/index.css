@@ -200,10 +200,16 @@ input {
   transform: scale(1.1) rotate(90deg);
 }
 
-.posts-grid {
+.my-masonry-grid {
+  display: flex;
+  margin-left: -24px; /* gutter size offset */
+  width: auto;
   flex: 1;
-  columns: 250px;
-  column-gap: 24px;
+}
+
+.my-masonry-grid_column {
+  padding-left: 24px; /* gutter size */
+  background-clip: padding-box;
 }
 
 .post-card {
@@ -214,9 +220,7 @@ input {
   transition: var(--transition-normal);
   background: var(--bg-secondary);
   cursor: pointer;
-  break-inside: avoid;
   margin-bottom: 24px;
-  display: inline-block;
   width: 100%;
 }
 
