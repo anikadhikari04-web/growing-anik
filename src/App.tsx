@@ -60,7 +60,7 @@ function App() {
   
   // Modal states
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [modalAction, setModalAction] = useState<'upload' | 'delete'>('upload');
+  const [modalAction, setModalAction] = useState<'upload' | 'delete' | 'uploadAvatar'>('upload');
   const [deleteTarget, setDeleteTarget] = useState<{tab: 'profits'|'payouts', index: number} | null>(null);
   
   // Lightbox state
@@ -71,6 +71,7 @@ function App() {
   
   // Refs
   const postInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Load from local storage and IndexedDB on mount
   useEffect(() => {
@@ -128,6 +129,11 @@ function App() {
     setShowPasswordModal(true);
   };
 
+  const triggerAvatarUpload = () => {
+    setModalAction('uploadAvatar');
+    setShowPasswordModal(true);
+  };
+
   const triggerDelete = (tab: 'profits' | 'payouts', index: number) => {
     setDeleteTarget({ tab, index });
     setModalAction('delete');
@@ -143,6 +149,8 @@ function App() {
       
       if (modalAction === 'upload') {
         postInputRef.current?.click();
+      } else if (modalAction === 'uploadAvatar') {
+        avatarInputRef.current?.click();
       } else if (modalAction === 'delete' && deleteTarget) {
         if (deleteTarget.tab === 'profits') {
           setProfits(prev => prev.filter((_, i) => i !== deleteTarget.index));
@@ -162,6 +170,18 @@ function App() {
     e.preventDefault();
   };
 
+  const handleAvatarImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const compressedImage = await compressImage(file);
+      setAvatarPhoto(compressedImage);
+      localStorage.setItem('profile-avatar', compressedImage);
+    }
+    if (avatarInputRef.current) {
+      avatarInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="container" onContextMenu={preventCopy}>
       {/* Cover Photo */}
@@ -177,13 +197,20 @@ function App() {
 
       {/* Profile Section */}
       <div className="profile-section">
-        <div className="profile-avatar-container locked">
+        <div className="profile-avatar-container" onClick={triggerAvatarUpload} style={{ cursor: 'pointer' }} title="Change Profile Picture">
           <img 
             src={avatarPhoto} 
             alt="Avatar" 
             className="profile-avatar protected-img" 
             onContextMenu={preventCopy}
             onDragStart={preventCopy}
+          />
+          <input 
+            type="file" 
+            accept="image/*" 
+            className="hidden-file-input" 
+            ref={avatarInputRef}
+            onChange={handleAvatarImageUpload}
           />
         </div>
         
@@ -272,7 +299,11 @@ function App() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h2>Authentication Required</h2>
             <p>
-              Please enter the password to {modalAction === 'upload' ? `upload images to ${activeTab === 'profits' ? 'Profits' : 'Certificates'}` : 'delete this image'}.
+              Please enter the password to {
+                modalAction === 'upload' ? `upload images to ${activeTab === 'profits' ? 'Profits' : 'Certificates'}` 
+                : modalAction === 'uploadAvatar' ? 'change profile picture' 
+                : 'delete this image'
+              }.
             </p>
             
             <form onSubmit={handlePasswordSubmit}>
