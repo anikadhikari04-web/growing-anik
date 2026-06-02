@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Plus, TrendingUp, Trash2, X } from 'lucide-react';
 import localforage from 'localforage';
 import './index.css';
+import defaultBanner from './assets/banner.png';
+import defaultAvatar from './assets/avatar.png';
 
 // Configure localforage for lifetime storage
 localforage.config({
@@ -48,8 +50,8 @@ const compressImage = (file: File): Promise<string> => {
 function App() {
   // Read-only state for profile details (loaded from local storage)
   const [name, setName] = useState("Anik Adhikari's Growth");
-  const [coverPhoto, setCoverPhoto] = useState('https://images.unsplash.com/photo-1707343843437-caacff5cfa74?q=80&w=2000&auto=format&fit=crop');
-  const [avatarPhoto, setAvatarPhoto] = useState('https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=300&auto=format&fit=crop');
+  const [coverPhoto, setCoverPhoto] = useState(defaultBanner);
+  const [avatarPhoto, setAvatarPhoto] = useState(defaultAvatar);
   
   // Tabs and content state
   const [activeTab, setActiveTab] = useState<'profits' | 'payouts'>('profits');
