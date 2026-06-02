@@ -112,17 +112,6 @@ function App() {
     fetchImages();
   }, []);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    
-    // We already authenticated to get here, but the actual upload happens inside handlePasswordSubmit
-    // Wait, the flow is: click -> password -> file input opens -> handleImageUpload runs
-    // Actually, we need the password inside handleImageUpload!
-    
-    // So we can prompt for password *first*, store it, then use it here.
-    // However, the password modal handles the actual file input click.
-  };
 
   const processUploads = async (files: FileList) => {
     try {
