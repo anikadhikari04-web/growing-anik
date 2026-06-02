@@ -274,7 +274,7 @@ function App() {
             onClick={triggerUpload}
             title={`Add new ${activeTab === 'profits' ? 'Profit' : 'Certificate'}`}
           >
-            <Plus size={24} />
+            <Plus size={18} />
           </button>
           
           <input 
